@@ -5,9 +5,12 @@ This project is an example project to show how to call the NSI API from golang.
 To build this project:
 ```
 go build
+
+```
+To run this project:
+```
 ./go-nsi-example
 ```
-
 expected output:
 ```
 https://nsi.sec.usace.army.mil/nsiapi/structures?fips=15005&fmt=fs
