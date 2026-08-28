@@ -9,6 +9,33 @@ import (
 	"net/http"
 )
 
+type recordSeparatorFilterReader struct {
+	r io.Reader
+}
+
+func (rsfr recordSeparatorFilterReader) Read(p []byte) (int, error) {
+	for {
+		n, err := rsfr.r.Read(p)
+		if n == 0 {
+			return n, err
+		}
+
+		w := 0
+		for _, b := range p[:n] {
+			// 0x1e is the ASCII record separator used by JSON text sequences.
+			if b == 0x1e {
+				continue
+			}
+			p[w] = b
+			w++
+		}
+
+		if w > 0 || err != nil {
+			return w, err
+		}
+	}
+}
+
 // NsiProperties is a reflection of the JSON feature property attributes from the NSI-API
 type NsiProperties struct {
 	Name             int     `json:"fd_id"`
@@ -98,9 +125,13 @@ func (nsp nsiStreamProvider) nsiStructureStream(url string, sp StreamProcessor) 
 		fmt.Println(err)
 	}
 	defer response.Body.Close()
-	dec := json.NewDecoder(response.Body)
-	//b, err := ioutil.ReadAll(response.Body)
-	//fmt.Println(string(b))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		body, _ := io.ReadAll(response.Body)
+		fmt.Printf("NSI API request failed with status %s: %s\n", response.Status, string(body))
+		return
+	}
+	dec := json.NewDecoder(recordSeparatorFilterReader{r: response.Body})
+
 	for {
 		var n NsiFeature
 		if err := dec.Decode(&n); err == io.EOF {
